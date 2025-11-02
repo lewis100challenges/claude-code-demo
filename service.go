@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"regexp"
+	"strings"
 )
 
 // User represents a user in the system
@@ -13,6 +15,11 @@ type User struct {
 	Username string `json:"username"`
 	Email    string `json:"email"`
 	Password string `json:"password"`
+}
+
+// ErrorResponse represents an error response
+type ErrorResponse struct {
+	Error string `json:"error"`
 }
 
 // UserService handles user-related operations
@@ -27,6 +34,51 @@ func NewUserService() *UserService {
 	}
 }
 
+// validateUser validates user input
+func validateUser(user User) error {
+	// Validate username
+	if strings.TrimSpace(user.Username) == "" {
+		return fmt.Errorf("username is required")
+	}
+	if len(user.Username) < 3 || len(user.Username) > 20 {
+		return fmt.Errorf("username must be between 3 and 20 characters")
+	}
+	usernameRegex := regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
+	if !usernameRegex.MatchString(user.Username) {
+		return fmt.Errorf("username can only contain letters, numbers, and underscores")
+	}
+
+	// Validate email
+	if strings.TrimSpace(user.Email) == "" {
+		return fmt.Errorf("email is required")
+	}
+	emailRegex := regexp.MustCompile(`^[^\s@]+@[^\s@]+\.[^\s@]+$`)
+	if !emailRegex.MatchString(user.Email) {
+		return fmt.Errorf("please enter a valid email address")
+	}
+
+	// Validate password
+	if strings.TrimSpace(user.Password) == "" {
+		return fmt.Errorf("password is required")
+	}
+	if len(user.Password) < 8 {
+		return fmt.Errorf("password must be at least 8 characters long")
+	}
+
+	// Validate password strength
+	if !regexp.MustCompile(`[A-Z]`).MatchString(user.Password) {
+		return fmt.Errorf("password must contain at least one uppercase letter")
+	}
+	if !regexp.MustCompile(`[a-z]`).MatchString(user.Password) {
+		return fmt.Errorf("password must contain at least one lowercase letter")
+	}
+	if !regexp.MustCompile(`[0-9]`).MatchString(user.Password) {
+		return fmt.Errorf("password must contain at least one number")
+	}
+
+	return nil
+}
+
 // SignUp handles user registration
 func (s *UserService) SignUp(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -37,12 +89,19 @@ func (s *UserService) SignUp(w http.ResponseWriter, r *http.Request) {
 	var user User
 	err := json.NewDecoder(r.Body).Decode(&user)
 	if err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: "Invalid request body"})
 		return
 	}
 
-	// TODO: Add input validation
-	// TODO: Add password strength validation
+	// Validate user input
+	if err := validateUser(user); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: err.Error()})
+		return
+	}
 
 	// Assign ID
 	user.ID = len(s.users) + 1
