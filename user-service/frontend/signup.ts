@@ -39,8 +39,12 @@ class SignupForm {
       password: formData.get('password') as string,
     };
 
-    // TODO: Add client-side validation
-    // TODO: Add password strength validation
+    // Validate input
+    const validationError = this.validateInput(signupData);
+    if (validationError) {
+      alert(validationError);
+      return;
+    }
 
     try {
       const response = await this.submitSignup(signupData);
@@ -48,6 +52,49 @@ class SignupForm {
     } catch (error) {
       this.handleError(error);
     }
+  }
+
+  private validateInput(data: SignupData): string | null {
+    // Validate username
+    if (!data.username || data.username.trim() === '') {
+      return 'Username is required';
+    }
+    if (data.username.length < 3 || data.username.length > 20) {
+      return 'Username must be between 3 and 20 characters';
+    }
+    if (!/^[a-zA-Z0-9_]+$/.test(data.username)) {
+      return 'Username can only contain letters, numbers, and underscores';
+    }
+
+    // Validate email
+    if (!data.email || data.email.trim() === '') {
+      return 'Email is required';
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(data.email)) {
+      return 'Please enter a valid email address';
+    }
+
+    // Validate password
+    if (!data.password || data.password.trim() === '') {
+      return 'Password is required';
+    }
+    if (data.password.length < 8) {
+      return 'Password must be at least 8 characters long';
+    }
+
+    // Validate password strength
+    if (!/[A-Z]/.test(data.password)) {
+      return 'Password must contain at least one uppercase letter';
+    }
+    if (!/[a-z]/.test(data.password)) {
+      return 'Password must contain at least one lowercase letter';
+    }
+    if (!/[0-9]/.test(data.password)) {
+      return 'Password must contain at least one number';
+    }
+
+    return null;
   }
 
   private async submitSignup(data: SignupData): Promise<SignupResponse> {
@@ -60,7 +107,8 @@ class SignupForm {
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const errorData = await response.json().catch(() => ({ error: 'An error occurred' }));
+      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
     }
 
     return await response.json();
